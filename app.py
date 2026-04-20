@@ -62,7 +62,7 @@ st.markdown("""
 # ==========================================
 @st.cache_data
 def load_data():
-    df = pd.read_csv("data/Price_Hike_Impact_DS.xlsx.csv")
+    df = pd.read_csv("Price_Hike_Impact_DS.xlsx.csv")
     df["Date"] = pd.to_datetime(df["Date"])
     df["Month-Year"] = df["Month-Year"].astype(str)
     return df
