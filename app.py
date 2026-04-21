@@ -1,6 +1,6 @@
 # ==========================================
 # INDEXME — PERSONAL INFLATION AI DASHBOARD
-# FINAL CLEAN WORKING VERSION (FIXED + COMPLETE)
+# FINAL CLEAN WORKING VERSION (AI FIXED)
 # ==========================================
 
 import streamlit as st
@@ -65,7 +65,7 @@ page = st.sidebar.radio(
         "💬 Smart Chat",
         "📋 Raw Data"
     ],
-    key="main_nav"   # ✅ FIX duplicate ID error
+    key="main_nav"
 )
 
 year = st.sidebar.multiselect("Year", df["Year"].unique(), df["Year"].unique())
@@ -115,7 +115,7 @@ cat["InflationRate"] = np.where(
 
 top = cat.sort_values("InflationRate", ascending=False).iloc[0]
 
-# ---------- ITEM (FIXED) ----------
+# ---------- ITEM ----------
 item = filtered.groupby("ItemName", as_index=False).agg({
     "CurrentCost":"sum",
     "BaseCost":"sum"
@@ -145,14 +145,12 @@ def smart_answer(q):
         client = Groq(api_key=st.secrets["GROQ_API_KEY"])
 
         context = f"""
-Financial assistant.
-
-Spend: ₹{total:,.2f}
-PIR: {pir:.2f}%
-CPI: {cpi:.2f}%
-Gap: {gap:.2f}%
-Top Category: {top['CategoryName']}
-Savings: ₹{savings:,.2f}
+Spend: ₹{total}
+PIR: {pir}
+CPI: {cpi}
+Gap: {gap}
+Top: {top['CategoryName']}
+Savings: {savings}
 """
 
         res = client.chat.completions.create(
@@ -160,9 +158,7 @@ Savings: ₹{savings:,.2f}
             messages=[
                 {"role":"system","content":context},
                 {"role":"user","content":q}
-            ],
-            temperature=0.4,
-            max_tokens=200
+            ]
         )
 
         return res.choices[0].message.content
@@ -172,11 +168,8 @@ Savings: ₹{savings:,.2f}
 
 
 def ai_insights():
-    try:
-        client = Groq(api_key=st.secrets["GROQ_API_KEY"])
-
-        prompt = f"""
-Problem:
+    client = Groq(api_key=st.secrets["GROQ_API_KEY"])
+    prompt=f"""Problem:
 Cause:
 Recommendation:
 Impact:
@@ -187,17 +180,12 @@ Gap:{gap}
 Top:{top['CategoryName']}
 Savings:{savings}
 """
-
-        res = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[{"role":"user","content":prompt}],
-            temperature=0.3
-        )
-
-        return res.choices[0].message.content
-
-    except Exception as e:
-        return f"Error: {str(e)}"
+    res=client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[{"role":"user","content":prompt}],
+        temperature=0.3
+    )
+    return res.choices[0].message.content
 
 # ---------- PAGES ----------
 if page=="🏠 Executive Dashboard":
@@ -210,6 +198,24 @@ if page=="🏠 Executive Dashboard":
 
     st.plotly_chart(px.line(trend,x="Month-Year",y="CurrentCost"),use_container_width=True)
 
+    # INSIGHT CARDS
+    st.subheader("📊 Key Insights")
+
+    i1,i2 = st.columns(2)
+    i3,i4 = st.columns(2)
+
+    with i1:
+        st.markdown(f"<div class='insight-box'><b>⚠ Inflation Status</b><br>{abs(gap):.2f}% {'above' if gap>0 else 'below'} CPI</div>", unsafe_allow_html=True)
+
+    with i2:
+        st.markdown(f"<div class='insight-box'><b>🔥 Top Driver</b><br>{top['CategoryName']} at {top['InflationRate']:.2f}%</div>", unsafe_allow_html=True)
+
+    with i3:
+        st.markdown(f"<div class='insight-box'><b>💰 Savings</b><br>₹{savings:,.0f}</div>", unsafe_allow_html=True)
+
+    with i4:
+        st.markdown(f"<div class='insight-box'><b>📈 Insight</b><br>Control high inflation categories</div>", unsafe_allow_html=True)
+
 elif page=="📂 Category Analysis":
     st.plotly_chart(px.bar(cat,x="CategoryName",y="InflationRate"),use_container_width=True)
 
@@ -217,14 +223,11 @@ elif page=="📦 Item Insights":
     st.subheader("📦 Item Insights")
 
     for _,r in item.iterrows():
-        inflation=float(r["Inflation"])
-        spend=float(r["CurrentCost"])
-
         st.markdown(f"""
         <div class='insight-box'>
         <b>{r['ItemName']}</b><br>
-        Inflation: {inflation:.2f}%<br>
-        Spend: ₹{spend:,.2f}
+        Inflation: {r['Inflation']:.2f}%<br>
+        Spend: ₹{r['CurrentCost']:,.2f}
         </div>
         """,unsafe_allow_html=True)
 
@@ -234,21 +237,31 @@ elif page=="🧠 AI Insights":
     show=st.checkbox("⚠ Show Disclaimer",True)
 
     if st.button("Generate AI Insights"):
-        out=ai_insights()
 
-        problem=cause=reco=impact=""
+        out = ai_insights()
+
+        problem = cause = reco = impact = ""
 
         for line in out.split("\n"):
             if "problem" in line.lower():
-                problem=line.split(":",1)[-1]
+                problem = line.split(":",1)[-1].strip()
             elif "cause" in line.lower():
-                cause=line.split(":",1)[-1]
+                cause = line.split(":",1)[-1].strip()
             elif "recommendation" in line.lower():
-                reco=line.split(":",1)[-1]
+                reco = line.split(":",1)[-1].strip()
             elif "impact" in line.lower():
-                impact=line.split(":",1)[-1]
+                impact = line.split(":",1)[-1].strip()
 
-        col1,col2=st.columns(2)
+        if not problem:
+            problem = f"PIR vs CPI gap is {gap:.2f}%"
+        if not cause:
+            cause = f"{top['CategoryName']} driving inflation"
+        if not reco:
+            reco = "Reduce high spending categories"
+        if not impact:
+            impact = f"Save ₹{savings:,.0f}"
+
+        col1,col2 = st.columns(2)
 
         with col1:
             st.markdown(f"<div class='insight-box'><b>⚠ Problem</b><br>{problem}</div>",unsafe_allow_html=True)
@@ -264,26 +277,19 @@ elif page=="🧠 AI Insights":
 elif page=="💬 Smart Chat":
     st.subheader("💬 Smart Chat")
 
-    show=st.checkbox("⚠ Show Disclaimer",True)
-
     if "chat" not in st.session_state:
         st.session_state.chat=[]
 
     q=st.chat_input("Ask about your spending...")
 
     if q:
-        with st.spinner("Thinking..."):
-            ans=smart_answer(q)
-
+        ans=smart_answer(q)
         st.session_state.chat.append(("user",q))
         st.session_state.chat.append(("assistant",ans))
 
     for r,m in st.session_state.chat:
         with st.chat_message(r):
             st.markdown(m)
-
-    if show:
-        st.warning("AI may make mistakes")
 
 elif page=="📋 Raw Data":
     st.dataframe(filtered)
